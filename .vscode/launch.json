@@ -1,0 +1,57 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debug Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Point-BERT: Train DVAE (3DTeethLand)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Point-BERT/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/src/Point-BERT",
+            "args": [
+                "--config",
+                "cfgs/3DTeethLand_models/dvae.yaml",
+                "--exp_name",
+                "test0"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
+        },
+        {
+            "name": "Point-BERT: Train DVAE (figaroa)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Point-BERT/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/src/Point-BERT",
+            "args": [
+                "--config",
+                "cfgs/PreprocessedIOS_models/dvae.yaml",
+                "--exp_name",
+                "figaroa",
+                "--num_workers",
+                "32"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
+        }
+    ]
+}
