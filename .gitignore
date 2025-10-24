@@ -1,5 +1,9 @@
 # Customs
+wandb
 _data
+*.ply
+*.stl
+*.pcd
 *.pt
 *.pth
 *.ckpt
