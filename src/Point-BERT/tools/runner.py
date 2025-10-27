@@ -1,3 +1,4 @@
+from venv import logger
 import torch
 import torch.nn as nn
 import os
@@ -28,7 +29,7 @@ def compute_loss(loss_1, loss_2, config, niter, train_writer):
     if _niter > ntime:
         kld_weight = target
     elif _niter < 0:
-        kld_weight = 0.
+        kld_weight = config.kldweight.start
     else:
         kld_weight = target + (start - target) *  (1. + math.cos(math.pi * float(_niter) / ntime)) / 2.
 
@@ -103,7 +104,7 @@ def run_net(args, config, train_writer=None, val_writer=None):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         base_model.train()
-
+        epoch_token_usage = torch.zeros(config.model.num_tokens, device='cuda') 
         epoch_start_time = time.time()
         batch_start_time = time.time()
         batch_time = AverageMeter()
@@ -127,6 +128,11 @@ def run_net(args, config, train_writer=None, val_writer=None):
 
 
             ret = base_model(points, temperature = temp, hard = False)
+            logits = ret[-1]
+            token_indices = torch.argmax(logits, dim=-1)  # B G  
+            unique_tokens = torch.unique(token_indices).numel()
+            for token_idx in token_indices:
+                epoch_token_usage[token_idx] += 1
 
             loss_1, loss_2 = base_model.module.get_loss(ret, points)
 
@@ -151,15 +157,14 @@ def run_net(args, config, train_writer=None, val_writer=None):
             if args.distributed:
                 torch.cuda.synchronize()
 
-
             if train_writer is not None:
                 train_writer.log({
                     'Loss/Batch/Loss_1': loss_1.item() * 1000,
                     'Loss/Batch/Loss_2': loss_2.item() * 1000,
                     'Loss/Batch/Temperature': temp,
-                    'Loss/Batch/LR': optimizer.param_groups[0]['lr']
+                    'Loss/Batch/LR': optimizer.param_groups[0]['lr'],
+                    'Codebook/UniqueTokens': unique_tokens
                 }, step=n_itr)
-
 
             batch_time.update(time.time() - batch_start_time)
             batch_start_time = time.time()
@@ -180,7 +185,16 @@ def run_net(args, config, train_writer=None, val_writer=None):
             train_writer.log({
                 'Loss/Epoch/Loss_1': losses.avg(0),
                 'Loss/Epoch/Loss_2': losses.avg(1)
-            }, step=epoch)
+            }, step=n_itr)
+        num_used_tokens = (epoch_token_usage > 0).sum().item()
+        token_usage_percentage = (num_used_tokens / config.model.num_tokens) * 100
+        if train_writer is not None:
+            train_writer.log({
+                'Codebook/UsedTokens': num_used_tokens,
+                'Codebook/UsagePercentage': token_usage_percentage
+            }, step=n_itr)
+        print_log(f'[Epoch {epoch}] Codebook usage: {num_used_tokens}/{config.model.num_tokens} ({token_usage_percentage:.2f}%)', logger=logger)
+
 
         print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()]), logger = logger)

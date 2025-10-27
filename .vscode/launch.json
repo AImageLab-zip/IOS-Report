@@ -53,5 +53,27 @@
                 "CUDA_VISIBLE_DEVICES": "0"
             }
         }
+        ,
+        {
+            "name": "Point-BERT: Run main_BERT.py (single GPU)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Point-BERT/main_BERT.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/src/Point-BERT",
+            "args": [
+                "--config",
+                "cfgs/Mixup_models/Point-BERT.yaml",
+                "--exp_name",
+                "pointBERT_pretrain",
+                "--val_freq",
+                "1"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
+        }
     ]
 }
