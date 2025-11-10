@@ -1,5 +1,5 @@
 {
-    "terminal.integrated.automationProfile.linux": { "path": "/work/grana_maxillo/IOS_DraftReport/.vscode/bash.sh" },
+    "terminal.integrated.automationProfile.linux": { "path": "/work/grana_maxillo/IOS-DraftReport/.vscode/bash.sh" },
     "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
     "editor.inlineSuggest.enabled": true,
 }

@@ -1,0 +1,26 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Output
+outputs/
+*.csv
+*.log
+
+# Token tracking (keep local only)
+token_usage.json
+
+# Don't ignore the all_descriptions.json in outputs
+!outputs/all_descriptions.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

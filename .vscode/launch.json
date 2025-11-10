@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "Python Debug Current File",
             "type": "debugpy",
@@ -69,6 +70,46 @@
                 "pointBERT_pretrain",
                 "--val_freq",
                 "1"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
+        },
+        {
+            "name": "Qwen3-IOS: Train Model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Qwen3-IOS/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/src/Qwen3-IOS/training",
+            "args": [
+                "--config",
+                "${workspaceFolder}/src/Qwen3-IOS/configs/base_config.yaml",
+                "--use_wandb",
+                "--run_name",
+                "qwen3_pt_test"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "CUDA_VISIBLE_DEVICES": "0"
+            }
+        },
+        {
+            "name": "Qwen3-IOS: Intraoral-Photos Train Model",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Qwen3-IOS/training/train_intraoralphotos.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "cwd": "${workspaceFolder}/src/Qwen3-IOS/training",
+            "args": [
+                "--config",
+                "${workspaceFolder}/src/Qwen3-IOS/configs/train_intraoralphotos.yaml",
+                "--use_wandb",
+                "--run_name",
+                "qwen3_intraoralphotos_finetune"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",

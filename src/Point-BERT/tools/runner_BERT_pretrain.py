@@ -175,7 +175,7 @@ def run_net(args, config, train_writer=None, val_writer=None):
         print_log('[Training] EPOCH: %d EpochTime = %.3f (s) Losses = %s' %
             (epoch,  epoch_end_time - epoch_start_time, ['%.4f' % l for l in losses.avg()]), logger = logger)
 
-        if epoch % args.val_freq == 0 and epoch != 0:
+        if False and epoch % args.val_freq == 0 and epoch != 0:
             # Validate the current model
             metrics = validate(base_model, extra_train_dataloader, test_dataloader, epoch, val_writer, args, config, logger=logger)
 
