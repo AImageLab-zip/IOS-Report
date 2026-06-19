@@ -1,0 +1,101 @@
+# Configuration for train_intraoralphotos.py
+# Training modes are selected via CLI flags (not this file):
+#   --train_vision   → unfreeze deeper ViT blocks (60% frozen by default)
+#   --train_language → LoRA adapters on LLM attention layers
+#   both             → joint single-step fine-tuning (recommended)
+
+# Model configuration
+model:
+  qwen_model_name: "Qwen/Qwen3-VL-4B-Instruct"
+  attn_implementation: "sdpa"  # sdpa | flash_attention_2 (requires A100/H100) | eager
+
+# Data configuration
+data:
+  dataset_dir: "/work/grana_maxillo/IOS-DraftReport/_data/Dataset_FerraraDump_400"
+  captions_dir: "/work/grana_maxillo/IOS-DraftReport/src/auto-captioning/real_captions"
+  
+  # Image preprocessing
+  image_size: [256, 256]
+  
+  # Instruction template
+  instruction_template_path: "/work/grana_maxillo/IOS-DraftReport/_data/qwen-template-iop.json"
+
+# ── Vision encoder fine-tuning ────────────────────────────────────────────────
+# Only used when --train_vision is passed.
+vision_finetune:
+  # Freeze the first N ViT blocks (default: auto = 60% of total blocks).
+  # With ~5k images, freezing early blocks prevents over-fitting.
+  # freeze_first_n_blocks: 16   # uncomment to override auto
+  lr: 1.0e-5
+
+# ── Language model fine-tuning (LoRA) ─────────────────────────────────────────
+# Only used when --train_language is passed.
+language_finetune:
+  lr: 2.0e-5
+  lora:
+    r: 16
+    lora_alpha: 32
+    lora_dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+# Training configuration
+training:
+  batch_size: 1
+  num_epochs: 20
+  learning_rate: 1.0e-5
+  weight_decay: 0.01
+  warmup_steps: 100
+  max_grad_norm: 1.0
+  
+  # Optimizer
+  optimizer: "adamw"
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  
+  # Learning rate schedule
+  lr_scheduler: "cosine"
+  
+  # Gradient accumulation (to simulate larger batch size)
+  gradient_accumulation_steps: 8  # Effective batch size = 2 * 8 = 16
+  
+  # Checkpointing
+  save_every_n_epochs: 10
+  output_dir: "outputs/qwen3vl_intraoralphotos"
+  
+  # Logging
+  logging_steps: 10
+  
+  # Validation
+  validation_split: 0.1
+  validate_per_epoch: true
+  generate_sample_during_val: false
+  val_max_new_tokens: 128
+  metrics_every_n_epochs: 5
+
+  # Generation metrics (BLEU, ROUGE, METEOR, Sentence-BERT)
+  compute_generation_metrics: true
+  max_samples_for_metrics: 20
+  compute_sbert: false            # set true when not time-constrained
+  return_per_field_accuracy: true
+
+  # Inference generation params (used during validation sampling)
+  generation:
+    temperature: 0.1
+    do_sample: false
+    top_p: 0.9
+    top_k: 1
+    repetition_penalty: 1.1
+    no_repeat_ngram_size: 3
+  
+  
+# Hardware configuration
+hardware:
+  num_workers: 4  # Number of data loading workers
+  
+# Seed for reproducibility
+seed: 42
+
+# Weights & Biases (optional)
+use_wandb: true
+run_name: "qwen3vl_vision_finetuning_intraoral"

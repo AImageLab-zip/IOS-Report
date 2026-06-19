@@ -1,0 +1,147 @@
+# LoRA Finetuning Configuration for PointQwen
+# This config is for Stage 2: Fine-tuning Qwen with LoRA while keeping PointEncoder frozen
+
+# Model configuration
+model:
+  qwen_model_name: "Qwen/Qwen3-VL-4B-Instruct"
+  projection_type: "simple"  # simple, deepstack
+  freeze_qwen: true
+  freeze_point_encoder: true
+  train_lora: true
+  
+  # Pretrained weights
+  pretrained_point_encoder: "/work/grana_maxillo/IOS-DraftReport/src/Qwen3-IOS/outputs/ios-classification/PointTransformer_32k_384_improv_bs64_gamma_3_512tk_final_fold4/best.pth"
+  pretrained_projector: "/path/to/pretrained/projection/weights.pt"  # Path to trained projection layer weights
+  
+  # Memory optimization
+  use_gradient_checkpointing: true 
+  low_cpu_mem_usage: true
+  use_flash_attention: true  # Enable Flash Attention for 2-3x speedup
+  
+  # Point encoder config
+  point_encoder:
+    trans_dim: 384
+    depth: 12
+    num_heads: 6
+    encoder_dims: 384
+    group_size: 32
+    num_group: 512
+    drop_path_rate: 0.1
+    output_dim: 384
+    projection_dropout: 0.1
+  
+  # Projection config
+  projection:
+    dropout: 0.1
+    num_deepstack_levels: 2
+    injection_layer_indices: [0, 1, 2]
+  
+  # LoRA configuration
+  lora:
+    r: 16  # LoRA rank
+    lora_alpha: 16  # LoRA alpha (recommended to match r)
+    lora_dropout: 0.0  # LoRA dropout
+    bias: "none"  # Bias training
+    use_rslora: false  # Rank-stabilized LoRA
+    use_4bit: false  # Use 4-bit quantization (set to true to save memory)
+    finetune_vision_layers: false  # Don't finetune vision (we don't have vision encoder)
+    finetune_language_layers: true  # Finetune language layers with LoRA
+    finetune_attention_modules: true  # Apply LoRA to attention
+    finetune_mlp_modules: true  # Apply LoRA to MLP
+    target_modules: "all-linear"  # Which modules to apply LoRA to
+
+# Data configuration
+data:
+  point_cloud_dir: "/work/grana_maxillo/IOS-DraftReport/_data/Dataset_FerraraDump_Bits2Bites"
+  captions_dir: "/work/grana_maxillo/IOS-DraftReport/src/auto-captioning/real_captions"
+  num_points: 32768
+  normalize: true
+  augment: true
+  instruction_template_path: "/work/grana_maxillo/IOS-DraftReport/_data/qwen-template.txt"
+
+# Training configuration
+training:
+  batch_size: 16
+  eval_batch_size: 1
+  num_epochs: 15
+  learning_rate: 1.0e-4  # Base learning rate
+  weight_decay: 0.001  # Base weight decay (not used with component-specific values)
+  warmup_steps: 10
+  max_grad_norm: 1.0
+  
+  # Component-specific learning rates
+  lora_lr: 1.0e-5  # Learning rate for LoRA adapters
+  projection_lr: 3.0e-4  # Learning rate for projection layer
+  point_encoder_lr: 0  # Frozen
+  qwen_lr: 0  # Base model frozen (LoRA adapters will train)
+  
+  # Component-specific weight decay
+  lora_weight_decay: 0.0  # No weight decay for LoRA (inherent regularization from low-rank)
+  projection_weight_decay: 0.01  # Moderate weight decay for projection (prevent overfitting)
+  
+  # Optimizer
+  optimizer: "adamw_8bit"  # Use 8-bit AdamW for memory efficiency
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  adam_epsilon: 1.0e-8
+  
+  # Learning rate schedule
+  lr_scheduler: "linear"
+  
+  # Gradient accumulation
+  gradient_accumulation_steps: 1
+  
+  # Mixed precision
+  use_fp16: false
+  use_bf16: true
+  
+  # Checkpointing
+  save_steps: 1000
+  save_total_limit: 1
+  output_dir: "outputs/pointqwen_lora_2"
+  
+  # Logging
+  logging_steps: 1
+  eval_steps: 1000
+  
+  # Validation
+  validation_split: 0.05
+  validate_per_epoch: false
+  generate_sample_during_val: true
+  val_max_new_tokens: 512
+  
+  # Generation metrics
+  compute_generation_metrics: true
+  max_samples_for_metrics: null
+  compute_sbert: false
+  return_per_field_accuracy: true
+  
+  # Generation parameters
+  generation:
+    temperature: 0.1
+    early_stopping: true
+    do_sample: false
+    num_beams: 4
+    repetition_penalty: 1.1
+    no_repeat_ngram_size: 3
+    top_p: 0.9
+    top_k: 1
+    max_new_tokens: 512  # Reduced from 1280 to save memory
+  
+  # SFTTrainer specific settings
+  remove_unused_columns: false
+  dataset_text_field: ""
+  dataset_kwargs:
+    skip_prepare_dataset: true
+  max_seq_length: 512
+
+# Hardware configuration
+hardware:
+  num_gpus: 1
+  num_workers: 8
+  distributed: false  # SFTTrainer handles distribution differently
+  
+# Seed for reproducibility
+seed: 42
+use_wandb: true
+run_name: "pointqwen_lora_training - single field"

@@ -1,0 +1,55 @@
+# OpenAI API Configuration
+api:
+  model: "gpt-4o-mini"  # Options: gpt-5-pro (best), gpt-5 (standard), gpt-5-mini (cheaper), gpt-5-nano (fastest)
+  max_tokens: 2000
+  temperature: 0.1  # Low temperature for consistent clinical descriptions
+  detail: "high"  # Image detail level: low, high, auto
+  
+# Dataset Configuration
+dataset:
+  root_path: "/work/grana_maxillo/IOS-DraftReport/_data/Dataset_FerraraDump_ToothFairy4M"
+  photos_subdir: "intraoral-photos"
+  
+  # Image views in order (without extensions - will search for .jpg, .jpeg, .png)
+  views:
+    - "left"
+    - "right"
+    - "up"
+    - "down"
+    - "center"
+  
+  # Supported image extensions (in order of preference)
+  image_extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+
+# Prompt Configuration
+prompt:
+  template_path: "/work/grana_maxillo/IOS-DraftReport/_data/qwen-template.txt"
+  
+# Output Configuration
+output:
+  dir: "outputs"
+  save_individual: true  # Save individual JSON files per patient
+  save_csv: true  # Save consolidated CSV
+  save_json: true  # Save consolidated JSON
+  resume: true  # Skip already processed patients
+
+# Processing Configuration
+processing:
+  batch_size: 1  # Process one patient at a time (API limitations)
+  max_retries: 3  # Number of retries on API failure
+  retry_delay: 5  # Seconds to wait between retries
+  rate_limit_delay: 1  # Seconds to wait between API calls
+  
+# Token Limits
+token_limits:
+  daily_limit: 250000  # Maximum tokens per day (input + output)
+  safety_margin: 0.95  # Stop at 95% of limit (237,500 tokens)
+  usage_file: "token_usage.json"  # Track daily usage
+  
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "auto_captioning.log"
