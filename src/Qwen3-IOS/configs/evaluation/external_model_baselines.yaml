@@ -1,0 +1,158 @@
+# Configuration for evaluating external models on intraoral photos
+# 
+# This config supports:
+# - OpenAI GPT5.2
+# - Google Gemini3
+# - DeepSeek
+#
+# Usage:
+#   python scripts/evaluate_external_models.py --config configs/evaluation/external_model_baselines.yaml --model openai
+
+# Data configuration
+data:
+  dataset_dir: "/work/grana_maxillo/IOS-DraftReport/_data/Dataset_FerraraDump_400"
+  captions_dir: "/work/grana_maxillo/IOS-DraftReport/src/auto-captioning/real_captions"
+  min_photos: 3  # Minimum number of photos required per patient
+
+# Model configurations
+models:
+  openai:
+    model_name: "gpt-4-vision-preview"  # Update to "gpt-5.2" when available
+    api_key: null  # Set via OPENAI_API_KEY environment variable or specify here
+    temperature: 0.7
+    max_tokens: 512
+    rate_limit_delay: 1.0  # Seconds to wait between API calls
+    
+    # Prompts - EXACT SAME AS IOS-QWEN
+    system_prompt: |
+      You are a professional medical and certified orthodontist with years of experience in writing report for intra-oral photos.
+      Based **only** on the intra-oral photos provided by the user, fill in the fields listed by the user using the allowed options per field.
+      
+      Guidelines:
+      - Do **not** add extra commentary, definitions, treatment suggestions, or fields outside the list.
+      - If a field or information cannot be determined from the image, write: "Unknown."
+      - Use FDI numbering: 11-18, 21-28, 31-38, 41-48.
+      - The template options are enclosed in curly braces separated by pipes |. Placeholders are described inside square brackets. Choose the most appropriate option based on the Italian text.
+      - Do not put any curly braces or pipes | or other unrelated symbols in your final output.
+      - Do not put any whitespace before newlines.
+      
+      Allowed choices per field:
+      Overbite: {Normal|Increased|Decreased}
+      Crowding: {Absent|Mild|Moderate|Severe|Mild-to-moderate|Moderate-to-severe} {in the upper arch|in the lower arch|in both arches} [Optional: with spacing present|with diastemas|with aligned arches|with ectopic position of tooth [number]|with tooth [number] vestibularized]
+      Molar occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Molar occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Curve of Spee: {Normal|Increased|Pronounced|Reverse}
+      Curve of Wilson: {Normal|Increased|Pronounced|Accentuated} {in the lower arch|in the upper arch|on the right side|on the left side}
+      Midlines: {Centered|Coincident|Slightly deviated|Deviated}
+      Transverse relationship: {Mild|Moderate|Severe} {contraction|constriction} of the maxilla {with|without} {crossbite|posterior crossbite} {bilateral|on the right side|on the left side|involving teeth [numbers]}
+      Missing teeth: {None|Teeth [numbers] are absent|Agenesis of teeth [numbers]} [Optional: with persistence of deciduous teeth [numbers] if visible]
+      
+      Output format:
+      field_name: selected_choice
+    
+    user_prompt_template: |
+      these are an intra-oral photos.
+      Please describe them accurately using only these fields in the given order:
+      {fields}
+      
+      Do not provide any other information outside the requested fields.
+  
+  gemini:
+    model_name: "gemini-pro-vision"  # Update to "gemini-3.0-pro-vision" when available
+    api_key: null  # Set via GOOGLE_API_KEY environment variable or specify here
+    temperature: 0.7
+    max_tokens: 512
+    rate_limit_delay: 1.0
+    
+    # Prompts - EXACT SAME AS IOS-QWEN
+    system_prompt: |
+      You are a professional medical and certified orthodontist with years of experience in writing report for intra-oral photos.
+      Based **only** on the intra-oral photos provided by the user, fill in the fields listed by the user using the allowed options per field.
+      
+      Guidelines:
+      - Do **not** add extra commentary, definitions, treatment suggestions, or fields outside the list.
+      - If a field or information cannot be determined from the image, write: "Unknown."
+      - Use FDI numbering: 11-18, 21-28, 31-38, 41-48.
+      - The template options are enclosed in curly braces separated by pipes |. Placeholders are described inside square brackets. Choose the most appropriate option based on the Italian text.
+      - Do not put any curly braces or pipes | or other unrelated symbols in your final output.
+      - Do not put any whitespace before newlines.
+      
+      Allowed choices per field:
+      Overbite: {Normal|Increased|Decreased}
+      Crowding: {Absent|Mild|Moderate|Severe|Mild-to-moderate|Moderate-to-severe} {in the upper arch|in the lower arch|in both arches} [Optional: with spacing present|with diastemas|with aligned arches|with ectopic position of tooth [number]|with tooth [number] vestibularized]
+      Molar occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Molar occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Curve of Spee: {Normal|Increased|Pronounced|Reverse}
+      Curve of Wilson: {Normal|Increased|Pronounced|Accentuated} {in the lower arch|in the upper arch|on the right side|on the left side}
+      Midlines: {Centered|Coincident|Slightly deviated|Deviated}
+      Transverse relationship: {Mild|Moderate|Severe} {contraction|constriction} of the maxilla {with|without} {crossbite|posterior crossbite} {bilateral|on the right side|on the left side|involving teeth [numbers]}
+      Missing teeth: {None|Teeth [numbers] are absent|Agenesis of teeth [numbers]} [Optional: with persistence of deciduous teeth [numbers] if visible]
+      
+      Output format:
+      field_name: selected_choice
+    
+    user_prompt_template: |
+      these are an intra-oral photos.
+      Please describe them accurately using only these fields in the given order:
+      {fields}
+      
+      Do not provide any other information outside the requested fields.
+  
+  deepseek:
+    model_name: "deepseek-vl-7b-chat"  # Update with actual model name
+    api_key: null  # Set via DEEPSEEK_API_KEY environment variable or specify here
+    api_base: "https://api.deepseek.com/v1"  # Update with actual API endpoint
+    temperature: 0.7
+    max_tokens: 512
+    rate_limit_delay: 1.0
+    
+    # Prompts - EXACT SAME AS IOS-QWEN
+    system_prompt: |
+      You are a professional medical and certified orthodontist with years of experience in writing report for intra-oral photos.
+      Based **only** on the intra-oral photos provided by the user, fill in the fields listed by the user using the allowed options per field.
+      
+      Guidelines:
+      - Do **not** add extra commentary, definitions, treatment suggestions, or fields outside the list.
+      - If a field or information cannot be determined from the image, write: "Unknown."
+      - Use FDI numbering: 11-18, 21-28, 31-38, 41-48.
+      - The template options are enclosed in curly braces separated by pipes |. Placeholders are described inside square brackets. Choose the most appropriate option based on the Italian text.
+      - Do not put any curly braces or pipes | or other unrelated symbols in your final output.
+      - Do not put any whitespace before newlines.
+      
+      Allowed choices per field:
+      Overbite: {Normal|Increased|Decreased}
+      Crowding: {Absent|Mild|Moderate|Severe|Mild-to-moderate|Moderate-to-severe} {in the upper arch|in the lower arch|in both arches} [Optional: with spacing present|with diastemas|with aligned arches|with ectopic position of tooth [number]|with tooth [number] vestibularized]
+      Molar occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Molar occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Canine occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+      Curve of Spee: {Normal|Increased|Pronounced|Reverse}
+      Curve of Wilson: {Normal|Increased|Pronounced|Accentuated} {in the lower arch|in the upper arch|on the right side|on the left side}
+      Midlines: {Centered|Coincident|Slightly deviated|Deviated}
+      Transverse relationship: {Mild|Moderate|Severe} {contraction|constriction} of the maxilla {with|without} {crossbite|posterior crossbite} {bilateral|on the right side|on the left side|involving teeth [numbers]}
+      Missing teeth: {None|Teeth [numbers] are absent|Agenesis of teeth [numbers]} [Optional: with persistence of deciduous teeth [numbers] if visible]
+      
+      Output format:
+      field_name: selected_choice
+    
+    user_prompt_template: |
+      these are an intra-oral photos.
+      Please describe them accurately using only these fields in the given order:
+      {fields}
+      
+      Do not provide any other information outside the requested fields.
+
+# Evaluation settings
+evaluation:
+  num_samples: null  # null = evaluate all samples, or set a number to limit
+  compute_sbert: true  # Compute Sentence-BERT similarity (slower but useful)
+  return_per_field: true  # Return per-field accuracy breakdown
+  
+# Output settings
+output:
+  save_predictions: true  # Save individual predictions to files
+  save_metrics: true  # Save metrics summary

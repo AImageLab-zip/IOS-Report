@@ -44,7 +44,7 @@ Input information:
 - The Italian text may be short, informal, or use abbreviations (e.g., "aff." for "affected").
 - Expand abbreviations and normalize phrasing while maintaining clinical accuracy.
 - Use FDI numbering (11-18 UR, 21-28 UL, 31-38 LL, 41-48 LR).
-- If a piece of information is missing or cannot be inferred, write “Unknown.”
+- If a piece of information is missing or cannot be inferred, write "Unknown."
 - Do **not** invent findings.
 - Do **not** add commentary, definitions, or treatment suggestions.
 - The template options are enclosed in curly braces separated by pipes |. Placeholders are described inside square brackets. Choose the most appropriate option based on the Italian text.

@@ -168,9 +168,9 @@ class IOSPointCloudDataset(Dataset):
     def _augment_point_cloud(self, pc: np.ndarray) -> np.ndarray:
         """Apply data augmentation."""
         # Random rotation around Z Y and X
-        angle_z = np.random.uniform(-np.pi//4, np.pi//4)
-        angle_y = np.random.uniform(-np.pi//18, np.pi//18)
-        angle_x = np.random.uniform(-np.pi//18, np.pi//18)
+        angle_z = np.random.uniform(-np.pi//6, np.pi//6)
+        angle_y = np.random.uniform(-np.pi//6, np.pi//6)
+        angle_x = np.random.uniform(-np.pi//6, np.pi//6)
         cos_z, sin_z = np.cos(angle_z), np.sin(angle_z)
         cos_y, sin_y = np.cos(angle_y), np.sin(angle_y)
         cos_x, sin_x = np.cos(angle_x), np.sin(angle_x)
@@ -192,6 +192,10 @@ class IOSPointCloudDataset(Dataset):
         # Random jitter
         jitter = np.random.normal(-0.01, 0.01, pc.shape)
         pc = pc + jitter
+        
+        # Random translation
+        translation = np.random.uniform(-0.1, 0.1, (1, 3))
+        pc = pc + translation
         
         # Random scale
         scale = np.random.uniform(0.95, 1.05)
@@ -301,22 +305,20 @@ class IOSCollator:
             field_value_pairs = []
             for line in desc_content.split('\n'):
                 line = line.strip()
-                if ':' in line and line:
+                if ':' in line and line and 'missing teeth' not in line.lower():
                     # Keep the entire "field: value" format
                     field_value_pairs.append(line)
 
-            random.shuffle(field_value_pairs)
+            # random.shuffle(field_value_pairs)
+            random_field_to_predict = random.choice(field_value_pairs)
+            field_name = random_field_to_predict.split(":")[0].strip()
+            field_value = random_field_to_predict.split(":")[1].strip()
             
-            field_names = [x.split(":")[0].strip() for x in field_value_pairs]
-            field_names_list = ', '.join(field_names) + "."
-            
-            # Join with newlines
-            field_names_lists.append(field_names_list)
-            formatted_descriptions.append('\n'.join(field_value_pairs) + "<|im_end|>")
+            formatted_descriptions.append(f"{field_value}<|im_end|>")
         
         instructions = [
-            inst.replace("<|fields_name|>", field_names_lists[i])
-            for i, inst in enumerate(instructions)
+            inst.replace("<|field_to_predict|>", field_name)
+            for inst in instructions
         ]
         
         # Tokenize

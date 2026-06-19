@@ -35,6 +35,9 @@ class PointToQwenProjection(nn.Module):
         self.point_dim = point_dim
         self.qwen_visual_dim = qwen_visual_dim
         
+        # Learnable gate alpha, initialized to ~0.1
+        self.alpha = nn.Parameter(torch.tensor(0.1))
+        
         if hidden_dim is None:
             hidden_dim = (point_dim + qwen_visual_dim) // 2
         
@@ -85,4 +88,6 @@ class PointToQwenProjection(nn.Module):
         """
         x = self.projection(point_tokens)
         x = self.output_norm(x)
+        # Apply learnable gate
+        x = self.alpha * x
         return x

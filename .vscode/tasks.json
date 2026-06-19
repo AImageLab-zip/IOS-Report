@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "srun-intraoral-debugpy",
+            "type": "shell",
+            "command": "srun --nodelist=$(hostname) --partition=all_serial --mem=24G --account=grana_maxillo --cpus-per-task=8 --gres=gpu:1 --time 4:00:00 --pty bash ${workspaceFolder}/.vscode/launch_debugpy.sh",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "debugpy",
+                "pattern": {
+                    "regexp": "^(.*)$",
+                    "message": 1
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".",
+                    "endsPattern": "DEBUGPY_READY"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "focus": false
+            }
+        }
+    ]
+}

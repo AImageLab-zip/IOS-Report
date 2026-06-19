@@ -228,7 +228,7 @@ def main():
             print("Ready to start pretraining!")
             print("\nTo start pretraining, run:")
             print("  cd /work/grana_maxillo/IOS-DraftReport/src/Qwen3-IOS")
-            print("  python training/pretrain.py --config configs/base_config.yaml")
+            print("  python training/train_aux_point_to_qwen_image_embedding.py --config configs/auxiliary_training/point_to_qwen_image_embedding_pretrain.yaml")
         
     except Exception as e:
         print("\n" + "=" * 80)

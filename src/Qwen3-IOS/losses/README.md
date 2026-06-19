@@ -107,4 +107,4 @@ training:
 
 ## Example
 
-See `configs/base_config_with_semantic_loss.yaml` for a complete configuration example.
+See `configs/training_setups/01_frozen_llm_joint_encoder_projector/deepstack_joint_encoder_projector_semantic_loss_alt.yaml` for a complete configuration example.

@@ -1,11 +1,28 @@
 """
-Training pipeline for fine-tuning Qwen3 VL vision encoder with intraoral photos.
+Training pipeline for fine-tuning Qwen3 VL with intraoral photos.
 
-This script:
-- Freezes the Qwen3 LLM completely
-- Fine-tunes ONLY the vision encoder
-- Uses 5 intraoral photos per patient as input
-- Uses template + caption for training with cross-entropy loss
+This script supports three modes via CLI flags (combinable in a single run):
+  --train_vision   Fine-tune the vision encoder only.
+                   Best practice for limited data (~5k images): only the last
+                   portion of ViT blocks are unfrozen to avoid over-fitting while
+                   still adapting to unseen dental image statistics.
+  --train_language Fine-tune the language model via LoRA adapters.
+                   Parameter-efficient (no catastrophic forgetting), learns the
+                   structured clinical report format and dental terminology.
+  Both flags       Joint single-step fine-tuning with component-specific LRs.
+                   Recommended for best end-to-end performance.
+
+Config overrides (optional, all have sensible defaults):
+  vision_finetune:
+    freeze_first_n_blocks: 16   # freeze early ViT blocks (limited-data regularisation)
+    lr: 1.0e-5
+  language_finetune:
+    lr: 2.0e-5
+    lora:
+      r: 16
+      lora_alpha: 32
+      lora_dropout: 0.05
+      target_modules: [q_proj, k_proj, v_proj, o_proj]
 """
 
 import os
@@ -21,6 +38,8 @@ import traceback
 import json
 import random
 
+import re
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -31,6 +50,7 @@ from PIL import Image
 
 import wandb
 from transformers import get_linear_schedule_with_warmup, AutoProcessor, Qwen3VLForConditionalGeneration
+from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 from typing import Dict, Optional, List
 
@@ -441,6 +461,11 @@ class Trainer:
         self.val_loader = val_loader
         self.device = device
         
+        # Training mode flags (stored on config by main())
+        self.train_vision = config.get('_train_vision', False)
+        self.train_language = config.get('_train_language', False)
+        self.use_lora = config.get('_use_lora', False)
+        
         self.optimizer = self._create_optimizer()
         self.scheduler = self._create_scheduler()
         
@@ -453,35 +478,71 @@ class Trainer:
         
         self.use_wandb = config.get('use_wandb', False)
         if self.use_wandb:
+            mode_tag = []
+            if self.train_vision:
+                mode_tag.append('vision')
+            if self.train_language:
+                mode_tag.append('lora')
             wandb.init(
                 project="pointqwen",
                 config=config,
-                name=config.get('run_name', 'qwen3vl_vision_finetuning'),
-                tags=["Photos"]
+                name=config.get('run_name', 'qwen3vl_photos_' + '+'.join(mode_tag or ['unknown'])),
+                tags=["Photos"] + mode_tag
             )
     
     def _create_optimizer(self) -> torch.optim.Optimizer:
-        """Create optimizer for vision encoder parameters only."""
+        """Create optimizer with component-specific learning rates."""
         train_config = self.config['training']
         
-        # Get vision encoder parameters (model.model.visual)
+        vision_cfg = self.config.get('vision_finetune', {})
+        lang_cfg = self.config.get('language_finetune', {})
+        
+        vision_lr = vision_cfg.get('lr', 1e-5)
+        lora_lr = lang_cfg.get('lr', 2e-5)
+        
+        # Bucket trainable params by component
         vision_params = []
+        lora_params = []
+        
         for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                if 'visual' in name:  # Vision encoder parameters
-                    vision_params.append(param)
+            if not param.requires_grad:
+                continue
+            if 'visual' in name:
+                vision_params.append(param)
+            else:
+                lora_params.append(param)  # LoRA adapter weights
         
-        if not vision_params:
-            raise ValueError("No trainable vision encoder parameters found!")
+        if not vision_params and not lora_params:
+            raise ValueError(
+                "No trainable parameters found. "
+                "Pass --train_vision and/or --train_language."
+            )
         
-        print(f"\nOptimizer Configuration:")
-        print(f"  Vision Encoder LR: {train_config['learning_rate']:.2e}")
+        param_groups = []
+        print("\nOptimizer Configuration:")
+        
+        if vision_params:
+            param_groups.append({
+                'params': vision_params,
+                'lr': vision_lr,
+                'name': 'vision_encoder'
+            })
+            print(f"  Vision encoder  LR: {vision_lr:.2e}  "
+                  f"({sum(p.numel() for p in vision_params):,} params)")
+        
+        if lora_params:
+            param_groups.append({
+                'params': lora_params,
+                'lr': lora_lr,
+                'name': 'language_lora'
+            })
+            print(f"  Language LoRA   LR: {lora_lr:.2e}  "
+                  f"({sum(p.numel() for p in lora_params):,} params)")
+        
         print(f"  Weight Decay: {train_config['weight_decay']}")
-        print(f"  Trainable Parameters: {sum(p.numel() for p in vision_params):,}")
         
         optimizer = AdamW(
-            vision_params,
-            lr=train_config['learning_rate'],
+            param_groups,
             betas=(train_config['adam_beta1'], train_config['adam_beta2']),
             eps=train_config['adam_epsilon'],
             weight_decay=train_config['weight_decay']
@@ -549,7 +610,6 @@ class Trainer:
                 )
                 
                 # Replace vision tokens (between <|vision_start|> and <|vision_end|>) with [IMAGE_TOKENS]
-                import re
                 vision_pattern = r'<\|vision_start\|>.*?<\|vision_end\|>'
                 full_text_with_placeholder = re.sub(vision_pattern, '[IMAGE_TOKENS]', full_text, flags=re.DOTALL)
                 
@@ -954,8 +1014,14 @@ class Trainer:
         """Run full training loop."""
         num_epochs = self.config['training']['num_epochs']
         
+        mode_desc = ' + '.join(
+            filter(None, [
+                'ViT encoder' if self.train_vision else None,
+                'LLM LoRA'    if self.train_language else None,
+            ])
+        ) or 'unknown'
         print("\n" + "=" * 60)
-        print("STARTING TRAINING: Qwen3 VL Vision Encoder Fine-tuning")
+        print(f"STARTING TRAINING: Qwen3 VL  [{mode_desc}]")
         print("=" * 60)
         print(f"Trainable parameters: {sum(p.numel() for p in self.model.parameters() if p.requires_grad):,}")
         print(f"Training epochs: {num_epochs}")
@@ -999,12 +1065,49 @@ class Trainer:
             wandb.finish()
     
     def save_checkpoint(self, name: str):
-        """Save model checkpoint."""
+        """Save model checkpoint.
+        
+        Saving strategy:
+        - No LoRA (vision only): full model via save_pretrained.
+        - LoRA only: adapter weights via save_pretrained (PeftModel).
+        - LoRA + vision: adapter weights + separate vision_encoder_state.pt.
+
+        Loading back:
+          # vision only
+          model = Qwen3VLForConditionalGeneration.from_pretrained(checkpoint_path)
+          # LoRA only
+          from peft import PeftModel
+          base = Qwen3VLForConditionalGeneration.from_pretrained(base_name)
+          model = PeftModel.from_pretrained(base, checkpoint_path)
+          # Both
+          base = Qwen3VLForConditionalGeneration.from_pretrained(base_name)
+          model = PeftModel.from_pretrained(base, checkpoint_path)
+          vision_sd = torch.load(checkpoint_path / 'vision_encoder_state.pt')
+          model.load_state_dict(vision_sd, strict=False)
+        """
         checkpoint_path = self.output_dir / name
         checkpoint_path.mkdir(exist_ok=True)
         
-        # Save full model (or just vision encoder)
-        self.model.save_pretrained(checkpoint_path)
+        if self.use_lora:
+            # PeftModel.save_pretrained saves the LoRA adapter weights only
+            self.model.save_pretrained(checkpoint_path)
+            
+            if self.train_vision:
+                # Also persist the fine-tuned vision encoder weights separately
+                vision_sd = {
+                    k: v.detach().cpu()
+                    for k, v in self.model.named_parameters()
+                    if 'visual' in k
+                }
+                torch.save(vision_sd, checkpoint_path / 'vision_encoder_state.pt')
+                print(f"  ↳ LoRA adapter + vision encoder weights saved")
+            else:
+                print(f"  ↳ LoRA adapter weights saved")
+        else:
+            # No LoRA – full model (vision encoder fine-tuned in place)
+            self.model.save_pretrained(checkpoint_path)
+            print(f"  ↳ Full model saved")
+        
         self.processor.save_pretrained(checkpoint_path)
         
         # Save training state
@@ -1013,39 +1116,130 @@ class Trainer:
             'scheduler': self.scheduler.state_dict() if self.scheduler else None,
             'epoch': self.current_epoch,
             'global_step': self.global_step,
-            'best_val_loss': self.best_val_loss
+            'best_val_loss': self.best_val_loss,
+            'train_vision': self.train_vision,
+            'train_language': self.train_language,
         }, checkpoint_path / 'training_state.pt')
         
         print(f"Saved checkpoint: {checkpoint_path}")
 
 
-def freeze_qwen_language_model(model: Qwen3VLForConditionalGeneration):
-    """Freeze all parameters except vision encoder."""
-    print("\nFreezing Qwen3 VL parameters...")
+def setup_trainable_parameters(
+    model: Qwen3VLForConditionalGeneration,
+    train_vision: bool,
+    train_language: bool,
+    config: Dict,
+) -> Qwen3VLForConditionalGeneration:
+    """
+    Set up which parameters are trainable based on CLI flags.
+
+    Limited-data best practices applied automatically:
+    - Vision encoder: freeze the first N ViT blocks (early blocks capture low-level
+      features that transfer well; only deeper blocks need adaptation for a new visual
+      domain with ~5k images).  Default: freeze the first 60 % of blocks.
+    - Language model: LoRA adapters (rank 16) on attention projections only.
+      Low rank + attention-only = minimal param count, low overfitting risk.
+    """
+    if not train_vision and not train_language:
+        raise ValueError(
+            "At least one of --train_vision or --train_language must be specified."
+        )
     
-    # Freeze everything first
+    print("\nSetting up trainable parameters...")
+    
+    # ── 1. Freeze everything ──────────────────────────────────────────────────
     for param in model.parameters():
         param.requires_grad = False
     
-    # Unfreeze only vision encoder (model.model.visual)
-    vision_params = 0
-    for name, param in model.named_parameters():
-        if 'visual' in name:
-            param.requires_grad = True
-            vision_params += param.numel()
+    # ── 2. Language model: LoRA adapters (applied first so PEFT can wrap) ─────
+    if train_language:
+        lang_cfg = config.get('language_finetune', {})
+        lora_cfg = lang_cfg.get('lora', {})
+        
+        # q/k/v/o_proj are LLM-specific names in Qwen3-VL;
+        # the ViT uses combined qkv projections with different naming.
+        target_modules = lora_cfg.get(
+            'target_modules', ["q_proj", "k_proj", "v_proj", "o_proj"]
+        )
+        
+        lora_config = LoraConfig(
+            r=lora_cfg.get('r', 16),
+            lora_alpha=lora_cfg.get('lora_alpha', 32),
+            lora_dropout=lora_cfg.get('lora_dropout', 0.05),
+            bias="none",
+            target_modules=target_modules,
+            task_type="CAUSAL_LM",
+        )
+        model = get_peft_model(model, lora_config)
+        print("✓ Applied LoRA to language model")
+        model.print_trainable_parameters()
     
-    print(f"✓ Frozen language model")
-    print(f"✓ Unfrozen vision encoder: {vision_params:,} parameters")
+    # ── 3. Vision encoder: selectively unfreeze deeper ViT blocks ────────────
+    if train_vision:
+        vision_cfg = config.get('vision_finetune', {})
+        
+        # Count total ViT blocks so we can compute 60 % dynamically
+        total_blocks = sum(
+            1 for n, _ in model.named_modules()
+            if re.fullmatch(r'.*visual\.blocks\.\d+', n)
+        )
+        default_freeze = max(0, int(total_blocks * 0.6)) if total_blocks > 0 else 0
+        freeze_first_n = vision_cfg.get('freeze_first_n_blocks', default_freeze)
+        
+        vision_trainable = 0
+        for name, param in model.named_parameters():
+            if 'visual' not in name:
+                continue
+            if freeze_first_n > 0:
+                m = re.search(r'blocks\.(\d+)', name)
+                if m and int(m.group(1)) < freeze_first_n:
+                    continue  # keep early block frozen
+            param.requires_grad = True
+            vision_trainable += param.numel()
+        
+        if total_blocks > 0:
+            print(
+                f"✓ Unfrozen vision encoder: {vision_trainable:,} params  "
+                f"(blocks {freeze_first_n}–{total_blocks - 1} of {total_blocks}; "
+                f"first {freeze_first_n} frozen for limited-data regularisation)"
+            )
+        else:
+            print(f"✓ Unfrozen vision encoder: {vision_trainable:,} params")
     
     return model
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune Qwen3 VL vision encoder with intraoral photos")
-    parser.add_argument('--config', type=str, required=True, help='Path to config file')
+    parser = argparse.ArgumentParser(
+        description="Fine-tune Qwen3 VL with intraoral photos.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+examples:
+  # fine-tune vision encoder only (limited-data safe: freezes first 60% of ViT blocks)
+  python train_intraoralphotos.py --config cfg.yaml --train_vision
+
+  # fine-tune language model via LoRA only
+  python train_intraoralphotos.py --config cfg.yaml --train_language
+
+  # joint single-step fine-tuning (recommended for best performance)
+  python train_intraoralphotos.py --config cfg.yaml --train_vision --train_language
+"""
+    )
+    parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
     parser.add_argument('--use_wandb', action='store_true', help='Use Weights & Biases logging')
     parser.add_argument('--run_name', type=str, default=None, help='Run name for wandb')
+    parser.add_argument(
+        '--train_vision', action='store_true',
+        help='Fine-tune the vision encoder (deeper ViT blocks only for limited data).'
+    )
+    parser.add_argument(
+        '--train_language', action='store_true',
+        help='Fine-tune the language model with LoRA adapters.'
+    )
     args = parser.parse_args()
+    
+    if not args.train_vision and not args.train_language:
+        parser.error("Specify at least one of --train_vision or --train_language.")
     
     # Load config
     with open(args.config, 'r') as f:
@@ -1054,6 +1248,11 @@ def main():
     config['use_wandb'] = args.use_wandb
     if args.run_name:
         config['run_name'] = args.run_name
+    
+    # Store training-mode flags on config so Trainer can read them
+    config['_train_vision'] = args.train_vision
+    config['_train_language'] = args.train_language
+    config['_use_lora'] = args.train_language  # LoRA is always used for language fine-tuning
     
     # Set seed
     torch.manual_seed(config['seed'])
@@ -1073,8 +1272,13 @@ def main():
     
     processor = AutoProcessor.from_pretrained(model_name)
     
-    # Freeze language model, unfreeze vision encoder
-    model = freeze_qwen_language_model(model)
+    # Configure trainable parameters according to --train_vision / --train_language
+    model = setup_trainable_parameters(
+        model,
+        train_vision=args.train_vision,
+        train_language=args.train_language,
+        config=config,
+    )
     
     # Create datasets
     print("\nLoading data...")

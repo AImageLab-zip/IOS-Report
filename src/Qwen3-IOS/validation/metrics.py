@@ -122,20 +122,26 @@ class FieldExtractor:
         if pred_norm == true_norm:
             return 1.0
         
-        # Molar/Canine acclusion
+        # Molar/Canine occlusion
         if field_type and ('molar' in field_type or 'canine' in field_type):
             # Extract class type (I, II, III)
             pred_class = FieldExtractor._extract_class(pred_norm)
             true_class = FieldExtractor._extract_class(true_norm)
             
             if pred_class and true_class:
-                if pred_class == true_class and pred_class == "class ii":
-                    # Same class, check modifiers
-                    return 0.75 if pred_norm != true_norm else 1.0
-                elif pred_class == true_class:
-                    return 1.0
+                if pred_class == true_class:
+                    # Same class - check if it's Class II with different modifiers
+                    if pred_class == "ii":
+                        # For Class II, give partial credit if modifiers differ
+                        # (e.g., "Class II division 1" vs "Class II division 2")
+                        return 0.75 if pred_norm != true_norm else 1.0
+                    else:
+                        # For Class I or III, same class means correct
+                        return 1.0
                 else:
+                    # Different classes (e.g., Class I vs Class II) - incorrect
                     return 0.0
+            # If class extraction failed for either, fall through to word overlap
         
         # missing teeth
         if 'missing teeth' in field_type:
@@ -165,6 +171,35 @@ class FieldExtractor:
         if match:
             return match.group(1).lower()
         return None
+    
+    @staticmethod
+    def should_skip_field(field_name: str, field_value: str) -> bool:
+        """
+        Determine if a field should be skipped in accuracy computation.
+        
+        Skip criteria:
+        - Occlusion fields (molar/canine) containing "Not assessable"
+        - Any field containing "Unknown"
+        
+        Args:
+            field_name: Name of the field
+            field_value: Value of the field
+        
+        Returns:
+            True if field should be skipped, False otherwise
+        """
+        value_lower = field_value.lower().strip()
+        
+        # Skip if contains "unknown"
+        if 'unknown' in value_lower:
+            return True
+        
+        # Skip occlusion fields with "not assessable"
+        if ('molar' in field_name or 'canine' in field_name):
+            if 'not assessable' in value_lower:
+                return True
+        
+        return False
 
 
 def compute_field_accuracy(
@@ -190,16 +225,31 @@ def compute_field_accuracy(
         if not ref_fields: # Forse qua dovrei segnarmi qualcosa nelle metriche?
             continue
         
+        # Filter out fields that should be skipped (Unknown, Not assessable)
+        ref_fields_filtered = {
+            k: v for k, v in ref_fields.items() 
+            if not FieldExtractor.should_skip_field(k, v)
+        }
+        pred_fields_filtered = {
+            k: v for k, v in pred_fields.items() 
+            if not FieldExtractor.should_skip_field(k, v)
+        }
+        
+        # Skip sample if all fields were filtered out
+        if not ref_fields_filtered:
+            continue
+        
         # Coverage: how many reference fields are present in prediction
-        coverage = len(set(ref_fields.keys()) & set(pred_fields.keys())) / len(ref_fields)
+        # (only counting non-skipped fields)
+        coverage = len(set(ref_fields_filtered.keys()) & set(pred_fields_filtered.keys())) / len(ref_fields_filtered)
         coverage_scores.append(coverage)
         
-        # Compare each reference field
+        # Compare each reference field (only non-skipped ones)
         sample_scores = []
-        for field_name, ref_value in ref_fields.items():
-            if field_name in pred_fields:
+        for field_name, ref_value in ref_fields_filtered.items():
+            if field_name in pred_fields_filtered:
                 score = FieldExtractor.compare_values(
-                    pred_fields[field_name],
+                    pred_fields_filtered[field_name],
                     ref_value,
                     field_type=field_name
                 )

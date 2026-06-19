@@ -15,78 +15,16 @@
             }
         },
         {
-            "name": "Point-BERT: Train DVAE (3DTeethLand)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Point-BERT/main.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "cwd": "${workspaceFolder}/src/Point-BERT",
-            "args": [
-                "--config",
-                "cfgs/3DTeethLand_models/dvae.yaml",
-                "--exp_name",
-                "test0"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "CUDA_VISIBLE_DEVICES": "0"
-            }
-        },
-        {
-            "name": "Point-BERT: Train DVAE (figaroa)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Point-BERT/main.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "cwd": "${workspaceFolder}/src/Point-BERT",
-            "args": [
-                "--config",
-                "cfgs/PreprocessedIOS_models/dvae.yaml",
-                "--exp_name",
-                "figaroa",
-                "--num_workers",
-                "32"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "CUDA_VISIBLE_DEVICES": "0"
-            }
-        }
-        ,
-        {
-            "name": "Point-BERT: Run main_BERT.py (single GPU)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Point-BERT/main_BERT.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "cwd": "${workspaceFolder}/src/Point-BERT",
-            "args": [
-                "--config",
-                "cfgs/Mixup_models/Point-BERT.yaml",
-                "--exp_name",
-                "pointBERT_pretrain",
-                "--val_freq",
-                "1"
-            ],
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}",
-                "CUDA_VISIBLE_DEVICES": "0"
-            }
-        },
-        {
             "name": "Qwen3-IOS: Train Model",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/Qwen3-IOS/training/train.py",
+            "program": "${workspaceFolder}/src/Qwen3-IOS/training/train_01_frozen_llm_joint_encoder_projector.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "cwd": "${workspaceFolder}/src/Qwen3-IOS/training",
             "args": [
                 "--config",
-                "${workspaceFolder}/src/Qwen3-IOS/configs/base_config.yaml",
+                "${workspaceFolder}/src/Qwen3-IOS/configs/training_setups/02_classification_pretrain_then_projector/02_pointqwen_projector_after_classification.yaml",
                 "--use_wandb",
                 "--run_name",
                 "qwen3_pt_test"
@@ -100,20 +38,22 @@
             "name": "Qwen3-IOS: Intraoral-Photos Train Model",
             "type": "debugpy",
             "request": "launch",
+            "python": "/homes/llumetti/llumetti_venvs/iosqwen/bin/python",
             "program": "${workspaceFolder}/src/Qwen3-IOS/training/train_intraoralphotos.py",
             "console": "integratedTerminal",
-            "justMyCode": true,
+            "justMyCode": false,
             "cwd": "${workspaceFolder}/src/Qwen3-IOS/training",
             "args": [
                 "--config",
-                "${workspaceFolder}/src/Qwen3-IOS/configs/train_intraoralphotos.yaml",
-                "--use_wandb",
+                "${workspaceFolder}/src/Qwen3-IOS/configs/auxiliary_training/qwen3vl_intraoral_photo_finetune.yaml",
+                "--train_vision",
                 "--run_name",
-                "qwen3_intraoralphotos_finetune"
+                "qwen3_intraoralphotos_debug"
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
-                "CUDA_VISIBLE_DEVICES": "0"
+                "CUDA_VISIBLE_DEVICES": "0",
+                "TOKENIZERS_PARALLELISM": "false"
             }
         }
     ]
