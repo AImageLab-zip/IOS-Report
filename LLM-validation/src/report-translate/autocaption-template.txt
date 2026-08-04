@@ -1,0 +1,11 @@
+Overbite: {Normal|Increased|Decreased}
+Crowding: {Absent|Mild|Moderate|Severe|Mild-to-moderate|Moderate-to-severe} {in the upper arch|in the lower arch|in both arches} [Optional: with spacing present|with diastemas|with aligned arches|with ectopic position of tooth [number]|with tooth [number] vestibularized]
+Molar occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+Molar occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+Canine occlusion - Right side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+Canine occlusion - Left side: {Class I|Class II head-to-head|Class II full|Class III|Not assessable due to absence of tooth [number]}
+Curve of Spee: {Normal|Increased|Pronounced|Reverse}
+Curve of Wilson: {Normal|Increased|Pronounced|Accentuated} {in the lower arch|in the upper arch|on the right side|on the left side}
+Midlines: {Centered|Coincident|Slightly deviated|Deviated}
+Transverse relationship: {Mild|Moderate|Severe} {contraction|constriction} of the maxilla {with|without} {crossbite|posterior crossbite} {bilateral|on the right side|on the left side|involving teeth [numbers]}
+Missing teeth: {None|Teeth [numbers] are absent|Agenesis of teeth [numbers]} [Optional: with persistence of deciduous teeth [numbers] if visible]

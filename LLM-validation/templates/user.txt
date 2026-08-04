@@ -1,0 +1,2 @@
+Given the five intraoral-photos provided, describe the given fields one-by-one:
+Overbite, Crowding, Molar occlusion - Right side, Molar occlusion - Left side, Canine occlusion - Right side, Canine occlusion - Left side, Curve of Spee, Curve of Wilson, Midlines, Transverse relationship, Missing teeth
